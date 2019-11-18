@@ -36,9 +36,15 @@ typedef void *NativeDisplayType;
 #endif
 
 /* EGL 1.2 types, renamed for consistency in EGL 1.3 */
+#ifndef EGLNativeDisplayType
 typedef NativeDisplayType EGLNativeDisplayType;
+#endif
+#ifndef EGLNativePixmapType
 typedef NativePixmapType EGLNativePixmapType;
+#endif
+#ifndef EGLNativeWindowType
 typedef NativeWindowType EGLNativeWindowType;
+#endif
 
 /* Define EGLint. This must be an integral type large enough to contain
  * all legal attribute names and values passed into and out of EGL,
@@ -49,7 +55,9 @@ typedef NativeWindowType EGLNativeWindowType;
  * integer type.
  */
 typedef int EGLint;
+#ifndef EGLAttrib
 typedef intptr_t EGLAttrib;
+#endif
 
 #endif /* __EGLPLATFORM_H__ */
 
