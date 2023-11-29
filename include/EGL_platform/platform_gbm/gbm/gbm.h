@@ -94,8 +94,15 @@ enum gbm_bo_format {
 /* 8 bpp Red */
 #define GBM_FORMAT_R8		__gbm_fourcc_code('R', '8', ' ', ' ') /* [7:0] R */
 
+/* 16 bpp Red */
+#define GBM_FORMAT_R16          __gbm_fourcc_code('R', '1', '6', ' ') /* [15:0] R little endian */
+
 /* 16 bpp RG */
 #define GBM_FORMAT_GR88		__gbm_fourcc_code('G', 'R', '8', '8') /* [15:0] G:R 8:8 little endian */
+
+/* 32 bpp RG */
+#define GBM_FORMAT_RG1616	__gbm_fourcc_code('R', 'G', '3', '2') /* [31:0] R:G 16:16 little endian */
+#define GBM_FORMAT_GR1616	__gbm_fourcc_code('G', 'R', '3', '2') /* [31:0] G:R 16:16 little endian */
 
 /* 8 bpp RGB */
 #define GBM_FORMAT_RGB332	__gbm_fourcc_code('R', 'G', 'B', '8') /* [7:0] R:G:B 3:3:2 */
@@ -150,6 +157,20 @@ enum gbm_bo_format {
 #define GBM_FORMAT_RGBA1010102	__gbm_fourcc_code('R', 'A', '3', '0') /* [31:0] R:G:B:A 10:10:10:2 little endian */
 #define GBM_FORMAT_BGRA1010102	__gbm_fourcc_code('B', 'A', '3', '0') /* [31:0] B:G:R:A 10:10:10:2 little endian */
 
+/* 64 bpp RGB */
+#define GBM_FORMAT_XBGR16161616	__gbm_fourcc_code('X', 'B', '4', '8') /* [63:0] x:B:G:R 16:16:16:16 little endian */
+
+#define GBM_FORMAT_ABGR16161616	__gbm_fourcc_code('A', 'B', '4', '8') /* [63:0] A:B:G:R 16:16:16:16 little endian */
+
+/*
+ * Floating point 64bpp RGB
+ * IEEE 754-2008 binary16 half-precision float
+ * [15:0] sign:exponent:mantissa 1:5:10
+ */
+#define GBM_FORMAT_XBGR16161616F __gbm_fourcc_code('X', 'B', '4', 'H') /* [63:0] x:B:G:R 16:16:16:16 little endian */
+
+#define GBM_FORMAT_ABGR16161616F __gbm_fourcc_code('A', 'B', '4', 'H') /* [63:0] A:B:G:R 16:16:16:16 little endian */
+
 /* packed YCbCr */
 #define GBM_FORMAT_YUYV		__gbm_fourcc_code('Y', 'U', 'Y', 'V') /* [31:0] Cr0:Y1:Cb0:Y0 8:8:8:8 little endian */
 #define GBM_FORMAT_YVYU		__gbm_fourcc_code('Y', 'V', 'Y', 'U') /* [31:0] Cb0:Y1:Cr0:Y0 8:8:8:8 little endian */
@@ -190,6 +211,9 @@ enum gbm_bo_format {
 #define GBM_FORMAT_YUV444	__gbm_fourcc_code('Y', 'U', '2', '4') /* non-subsampled Cb (1) and Cr (2) planes */
 #define GBM_FORMAT_YVU444	__gbm_fourcc_code('Y', 'V', '2', '4') /* non-subsampled Cr (1) and Cb (2) planes */
 
+struct gbm_format_name_desc {
+   char name[5];
+};
 
 /**
  * Flags to indicate the intended use for the buffer - these are passed into
@@ -226,6 +250,20 @@ enum gbm_bo_flags {
     * Buffer is linear, i.e. not tiled.
     */
    GBM_BO_USE_LINEAR = (1 << 4),
+   /**
+    * Buffer is protected, i.e. encrypted and not readable by CPU or any
+    * other non-secure / non-trusted components nor by non-trusted OpenGL,
+    * OpenCL, and Vulkan applications.
+    */
+   GBM_BO_USE_PROTECTED = (1 << 5),
+
+   /**
+    * The buffer will be used for front buffer rendering.  On some
+    * platforms this may (for example) disable framebuffer compression
+    * to avoid problems with compression flags data being out of sync
+    * with pixel data.
+    */
+   GBM_BO_USE_FRONT_RENDERING = (1 << 6),
 };
 
 int
@@ -236,7 +274,7 @@ gbm_device_get_backend_name(struct gbm_device *gbm);
 
 int
 gbm_device_is_format_supported(struct gbm_device *gbm,
-                               uint32_t format, uint32_t usage);
+                               uint32_t format, uint32_t flags);
 
 int
 gbm_device_get_format_modifier_plane_count(struct gbm_device *gbm,
@@ -260,6 +298,15 @@ gbm_bo_create_with_modifiers(struct gbm_device *gbm,
                              uint32_t format,
                              const uint64_t *modifiers,
                              const unsigned int count);
+
+struct gbm_bo *
+gbm_bo_create_with_modifiers2(struct gbm_device *gbm,
+                              uint32_t width, uint32_t height,
+                              uint32_t format,
+                              const uint64_t *modifiers,
+                              const unsigned int count,
+                              uint32_t flags);
+
 #define GBM_BO_IMPORT_WL_BUFFER         0x5501
 #define GBM_BO_IMPORT_EGL_IMAGE         0x5502
 #define GBM_BO_IMPORT_FD                0x5503
@@ -273,20 +320,22 @@ struct gbm_import_fd_data {
    uint32_t format;
 };
 
+#define GBM_MAX_PLANES 4
+
 struct gbm_import_fd_modifier_data {
    uint32_t width;
    uint32_t height;
    uint32_t format;
    uint32_t num_fds;
-   int fds[4];
-   int strides[4];
-   int offsets[4];
+   int fds[GBM_MAX_PLANES];
+   int strides[GBM_MAX_PLANES];
+   int offsets[GBM_MAX_PLANES];
    uint64_t modifier;
 };
 
 struct gbm_bo *
 gbm_bo_import(struct gbm_device *gbm, uint32_t type,
-              void *buffer, uint32_t usage);
+              void *buffer, uint32_t flags);
 
 /**
  * Flags to indicate the type of mapping for the buffer - these are
@@ -363,6 +412,9 @@ union gbm_bo_handle
 gbm_bo_get_handle_for_plane(struct gbm_bo *bo, int plane);
 
 int
+gbm_bo_get_fd_for_plane(struct gbm_bo *bo, int plane);
+
+int
 gbm_bo_write(struct gbm_bo *bo, const void *buf, size_t count);
 
 void
@@ -387,6 +439,14 @@ gbm_surface_create_with_modifiers(struct gbm_device *gbm,
                                   const uint64_t *modifiers,
                                   const unsigned int count);
 
+struct gbm_surface *
+gbm_surface_create_with_modifiers2(struct gbm_device *gbm,
+                                   uint32_t width, uint32_t height,
+                                   uint32_t format,
+                                   const uint64_t *modifiers,
+                                   const unsigned int count,
+                                   uint32_t flags);
+
 struct gbm_bo *
 gbm_surface_lock_front_buffer(struct gbm_surface *surface);
 
@@ -398,6 +458,9 @@ gbm_surface_has_free_buffers(struct gbm_surface *surface);
 
 void
 gbm_surface_destroy(struct gbm_surface *surface);
+
+char *
+gbm_format_get_name(uint32_t gbm_format, struct gbm_format_name_desc *desc);
 
 #ifdef __cplusplus
 }

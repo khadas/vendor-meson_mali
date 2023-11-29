@@ -5,6 +5,6 @@ includedir=${prefix}/include
 
 Name: gbm
 Description: meson gbm library
-Version: 17.2.0
+Version: 22.3.5
 Libs: -L${libdir} -lgbm
 Cflags: -I${includedir}/ 
